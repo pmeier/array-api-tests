@@ -3,10 +3,7 @@ from importlib import import_module
 
 from . import function_stubs
 
-# Replace this with a specific array module to test it, for example,
-#
-# import numpy as array_module
-array_module = None
+from ._pytorch import array_module
 
 if array_module is None:
     if 'ARRAY_API_TESTS_MODULE' in os.environ:
