@@ -1,0 +1,12 @@
+name: array-api-tests-pytorch
+channels:
+  - pytorch-nightly
+dependencies:
+  # array-api-tests
+  - python>=3.8
+  - pytest
+  - hypothesis
+  - numpy
+  # pytorch
+  - pytorch
+  - cpuonly
