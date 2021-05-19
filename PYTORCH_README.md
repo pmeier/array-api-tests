@@ -109,3 +109,29 @@ size = 2 * 3 * 4
 assert t.size() == t.shape
 assert t.numel() == size
 ```
+
+## Missing operators
+
+The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/array_object.html#size) the following operators, but they are not supported by PyTorch:
+
+- `__array_namespace__`
+- `__dlpack__`
+- `__dlpack_device__`
+- `__rand__`
+- `__rlshift__`
+- `__imatmul__`
+- `__rmatmul__`
+- `__rmod__`
+- `__ror__`
+- `__rrshift__`
+- `__rxor__`
+- `from_dlpack`
+- `broadcast_arrays`
+- `bitwise_left_shift`
+- `bitwise_invert`
+- `bitwise_right_shift`
+- `eigvalsh`
+- `inv`
+- `pinv`
+- `concat`
+- `expand_dims`
