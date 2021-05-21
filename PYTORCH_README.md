@@ -2,9 +2,9 @@
 
 This documents all deviations of [PyTorch](https://pytorch.org) from the array API specification identified by the test suite.
 
-Array API specification commit: [9efd284](https://github.com/data-apis/array-api/tree/9efd2844ad6d78fe15f1a0c791a1ecdf625b9201)
+Array API specification commit: [0429693](https://github.com/data-apis/array-api/tree/0429693ca26c55c9dd697279bc13cfa5169c0994)
 
-PyTorch version: `1.9.0.dev20210517`
+PyTorch version: `1.9.0.dev20210520`
 
 ## Unsigned integer data types
 
@@ -115,6 +115,12 @@ assert t.numel() == size
 
 The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/array_object.html#size) the following operators, but they are not supported by PyTorch:
 
+```shell
+pytest array_api_tests/test_signatures.py::test_has_names \
+    | grep FAILED \
+    | sed -E "s/FAILED array_api_tests\/test_signatures.py::test_has_names\[(\w+)\].*/- \`\1\`/"
+```
+
 - `__array_namespace__`
 - `__dlpack__`
 - `__dlpack_device__`
@@ -131,8 +137,6 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 - `bitwise_left_shift`
 - `bitwise_invert`
 - `bitwise_right_shift`
-- `eigvalsh`
-- `inv`
-- `pinv`
+- `vecdot`
 - `concat`
 - `expand_dims`
