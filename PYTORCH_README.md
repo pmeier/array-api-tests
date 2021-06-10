@@ -17,7 +17,7 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 
 Of those, PyTorch [only supports `uint8`](https://pytorch.org/docs/stable/tensor_attributes.html#torch-dtype).
 
-Reference: pytorch/pytorch#58734
+Reference: [#58734](https://github.com/pytorch/pytorch/issues/58734)
 
 ## Inter-category type promotion involving 0d-array's
 
@@ -65,7 +65,7 @@ torch.complex64 + torch.complex128 = torch.complex64
 
 This is [not documented well](https://github.com/pytorch/pytorch/issues/58489), but seems to be intentional.
 
-Reference: pytorch/pytorch#58736
+Reference: [#58736](https://github.com/pytorch/pytorch/issues/58736)
 
 ## Constants
 
@@ -78,7 +78,7 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 
 PyTorch supports none.
 
-Reference: pytorch/pytorch#58739
+Reference: [#58739](https://github.com/pytorch/pytorch/issues/58739)
 
 ## `logical_*` operators with scalars
 
@@ -101,7 +101,7 @@ tensor(False)
 TypeError: logical_and(): argument 'other' (position 2) must be Tensor, not bool
 ```
 
-Reference: pytorch/pytorch#58740
+Reference: [#58740](https://github.com/pytorch/pytorch/issues/58740)
 
 ## Number of elements
 
@@ -119,7 +119,7 @@ assert t.size() == t.shape
 assert t.numel() == size
 ```
 
-Reference: pytorch/pytorch#58741
+Reference: [#58741](https://github.com/pytorch/pytorch/issues/58741)
 
 ## Missing operators
 
@@ -149,7 +149,7 @@ pytest array_api_tests/test_signatures.py::test_has_names \
 - `concat`
 - `expand_dims`
 
-Reference: pytorch/pytorch#58742
+Reference: [#58742](https://github.com/pytorch/pytorch/issues/58742)
 
 ## Negative step sizes for slicing
 
@@ -166,7 +166,7 @@ t[::-1]
 ValueError: step must be greater than zero
 ```
 
-Reference: pytorch/pytorch#59786
+Reference: [#59786](https://github.com/pytorch/pytorch/issues/59786)
 
 ## Single ellipsis for slicing
 
@@ -179,4 +179,4 @@ a = torch.rand((1, 2, 3, 4, 5))
 a[..., 0, ..., ...]
 ```
 
-Reference: pytorch/pytorch#59787
+Reference: [#59787](https://github.com/pytorch/pytorch/issues/59787)
