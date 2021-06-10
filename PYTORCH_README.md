@@ -2,9 +2,9 @@
 
 This documents all deviations of [PyTorch](https://pytorch.org) from the array API specification identified by the test suite.
 
-Array API specification commit: [0429693](https://github.com/data-apis/array-api/tree/0429693ca26c55c9dd697279bc13cfa5169c0994)
+Array API specification commit: [64cad4b](https://github.com/data-apis/array-api/tree/64cad4b95cc2f60d89c82b88b3e3e91b90d4a4ae)
 
-PyTorch version: `1.9.0.dev20210520`
+PyTorch version: `1.10.0.dev20210609`
 
 ## Unsigned integer data types
 
@@ -16,6 +16,8 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 4. `uint64`.
 
 Of those, PyTorch [only supports `uint8`](https://pytorch.org/docs/stable/tensor_attributes.html#torch-dtype).
+
+Reference: pytorch/pytorch#58734
 
 ## Inter-category type promotion involving 0d-array's
 
@@ -63,6 +65,8 @@ torch.complex64 + torch.complex128 = torch.complex64
 
 This is [not documented well](https://github.com/pytorch/pytorch/issues/58489), but seems to be intentional.
 
+Reference: pytorch/pytorch#58736
+
 ## Constants
 
 The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/constants.html) four numeric constants:
@@ -73,6 +77,8 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 - `pi`
 
 PyTorch supports none.
+
+Reference: pytorch/pytorch#58739
 
 ## `logical_*` operators with scalars
 
@@ -95,6 +101,8 @@ tensor(False)
 TypeError: logical_and(): argument 'other' (position 2) must be Tensor, not bool
 ```
 
+Reference: pytorch/pytorch#58740
+
 ## Number of elements
 
 The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/array_object.html#size) that the `size` attribute of an array should return an integer with the number of elements of the array.
@@ -110,6 +118,8 @@ size = 2 * 3 * 4
 assert t.size() == t.shape
 assert t.numel() == size
 ```
+
+Reference: pytorch/pytorch#58741
 
 ## Missing operators
 
@@ -127,8 +137,6 @@ pytest array_api_tests/test_signatures.py::test_has_names \
 - `__rand__`
 - `__rlshift__`
 - `__imatmul__`
-- `__rmatmul__`
-- `__rmod__`
 - `__ror__`
 - `__rrshift__`
 - `__rxor__`
@@ -140,3 +148,35 @@ pytest array_api_tests/test_signatures.py::test_has_names \
 - `vecdot`
 - `concat`
 - `expand_dims`
+
+Reference: pytorch/pytorch#58742
+
+## Negative step sizes for slicing
+
+The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/indexing.html#slice-syntax) that the slicing syntax needs to be equivalent to Pythons [`slice()`](https://docs.python.org/3/library/functions.html#slice) syntax. That includes negative step sizes that PyTorch does not support:
+
+```python
+import torch
+
+t = torch.rand((3,))
+t[::-1]
+```
+
+```
+ValueError: step must be greater than zero
+```
+
+Reference: pytorch/pytorch#59786
+
+## Single ellipsis for slicing
+
+The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/indexing.html#multi-axis-indexing) that the slice for nd tensors shall contain at most a single [ellipsis](https://docs.python.org/3/library/constants.html#Ellipsis) (`...`). PyTorch allows an arbitrary number.
+
+```
+import torch
+
+a = torch.rand((1, 2, 3, 4, 5))
+a[..., 0, ..., ...]
+```
+
+Reference: pytorch/pytorch#59787
