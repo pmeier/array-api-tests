@@ -17,6 +17,9 @@ array_module.Tensor.size = property(lambda self: self.numel())
 
 def patch_full(full):
     def wrapper(shape, fill_value, dtype=None, **kwargs):
+        if dtype and not dtype.is_floating_point:
+            return full(shape, fill_value, dtype=dtype, **kwargs)
+
         finfo = torch.finfo(dtype or torch.float32)
 
         if fill_value > finfo.max:
