@@ -149,6 +149,8 @@ pytest array_api_tests/test_signatures.py::test_has_names \
 - `concat`
 - `expand_dims`
 
+In addition `__ipow__` needs to be implemented, but will not be picked up by this test, since [it exists as a stub](https://github.com/pytorch/pytorch/blob/dc67b47bc9d53dbeb898a4d920b0225ac73629ec/torch/tensor.py#L531-L536) for `__torch_function__` overrides.
+
 Reference: [#58742](https://github.com/pytorch/pytorch/issues/58742)
 
 ## Negative step sizes for slicing
@@ -180,3 +182,37 @@ a[..., 0, ..., ...]
 ```
 
 Reference: [#59787](https://github.com/pytorch/pytorch/issues/59787)
+
+## Bitwise shifts should retain the same dtype as the first input
+
+The array API specification stipulates that [`bitwise_left_shift`](https://data-apis.org/array-api/latest/API_specification/elementwise_functions.html#id29) and [`bitwise_left_shift`](https://data-apis.org/array-api/latest/API_specification/elementwise_functions.html#id35) (as well as the corresponding magics `__lshift__` and `__rshift__`) do not participate in the default type promotion, but rather retain the dtype of the first input. PyTorch performs the standard type promotion.
+
+```python
+>>> x1 = torch.tensor([0, 1], dtype=torch.uint8)
+>>> x2 = torch.tensor([0, 1], dtype=torch.int8)
+>>> (x1 << x2).dtype, x1.dtype
+(torch.int16, torch.uint8)
+>>> (x2 << x1).dtype, x2.dtype
+(torch.int16, torch.int8)
+>>> (x1 >> x2).dtype, x1.dtype
+(torch.int16, torch.uint8)
+>>> (x2 >> x1).dtype, x2.dtype
+(torch.int16, torch.int8)
+```
+
+Reference: [#59867](https://github.com/pytorch/pytorch/issues/59867)
+
+## Python scalars should be promoted to the same `dtype` as the respective tensor
+
+The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/type_promotion.html#mixing-arrays-with-python-scalars) that for binary operations involving a tensor and a Python scalar, the scalar needs to be converted to the same `dtype` as the tensor before the operation is performed. PyTorch casts the scalar to a tensor based on its `dtype` and afterwards performs the default type promotion for the operator. 
+
+This can lead to overflows if the tensor `dtype` can hold the values of the scalar, but the automatically determined `dtype` cannot.
+
+```python
+>>> torch.tensor(0, dtype=torch.float32) + 2.0 ** 63
+tensor(9.2234e+18)
+>>> torch.tensor(0, dtype=torch.float32) + 2 ** 63
+RuntimeError: Overflow when unpacking long
+```
+
+Reference: [#59868](https://github.com/pytorch/pytorch/issues/59868)
