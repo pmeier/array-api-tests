@@ -29,7 +29,7 @@ IN_PLACE_OPERATOR_RE = regex.compile(r'- `.*`. May be implemented via `__i(.*)__
 REFLECTED_OPERATOR_RE = regex.compile(r'- `__r(.*)__`')
 ALIAS_RE = regex.compile(r'Alias for {ref}`function-(.*)`.')
 
-NAME_RE = regex.compile(r'(.*)\(.*\)')
+NAME_RE = regex.compile(r'(.*?)\(.*\)')
 
 STUB_FILE_HEADER = '''\
 """
@@ -90,7 +90,8 @@ The type variables should be replaced with the actual types for a given
 library, e.g., for NumPy TypeVar('array') would be replaced with ndarray.
 """
 
-from typing import List, Literal, Optional, Tuple, Union, TypeVar
+from dataclasses import dataclass
+from typing import Any, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 array = TypeVar('array')
 device = TypeVar('device')
@@ -98,17 +99,38 @@ dtype = TypeVar('dtype')
 SupportsDLPack = TypeVar('SupportsDLPack')
 SupportsBufferProtocol = TypeVar('SupportsBufferProtocol')
 PyCapsule = TypeVar('PyCapsule')
+# ellipsis cannot actually be imported from anywhere, so include a dummy here
+# to keep pyflakes happy. https://github.com/python/typeshed/issues/3556
+ellipsis = TypeVar('ellipsis')
 
-__all__ = ['List', 'Literal', 'Optional', 'Tuple', 'Union', 'array', 'device',
-'dtype', 'SupportsDLPack', 'SupportsBufferProtocol', 'PyCapsule']
+@dataclass
+class finfo_object:
+    bits: int
+    eps: float
+    max: float
+    min: float
+    smallest_normal: float
+
+@dataclass
+class iinfo_object:
+    bits: int
+    max: int
+    min: int
+
+# This should really be recursive, but that isn't supported yet.
+NestedSequence = Sequence[Sequence[Any]]
+
+__all__ = ['Any', 'List', 'Literal', 'NestedSequence', 'Optional',
+'PyCapsule', 'SupportsBufferProtocol', 'SupportsDLPack', 'Tuple', 'Union',
+'array', 'device', 'dtype', 'ellipsis', 'finfo_object', 'iinfo_object']
 
 '''
 def main():
-    parser = argparse.ArgumentParser(__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('array_api_repo', help="Path to clone of the array-api repository")
     parser.add_argument('--no-write', help="""Print what it would do but don't
     write any files""", action='store_false', dest='write')
-    parser.add_argument('--quiet', help="""Don't print any output to the terminal""", action='store_true', dest='quiet')
+    parser.add_argument('-v', '--verbose', help="""Print verbose output to the terminal""", action='store_true')
     args = parser.parse_args()
 
     types_path = os.path.join('array_api_tests', 'function_stubs', '_types.py')
@@ -132,7 +154,7 @@ def main():
         attributes = ATTRIBUTE_RE.findall(text)
         if not (functions or methods or constants or attributes):
             continue
-        if not args.quiet:
+        if args.verbose:
             print(f"Found signatures in {filename}")
         if not args.write:
             continue
@@ -150,10 +172,10 @@ def main():
         py_path = os.path.join('array_api_tests', 'function_stubs', py_file)
         module_name = py_file.replace('.py', '')
         modules[module_name] = []
-        if not args.quiet:
+        if args.verbose:
             print(f"Writing {py_path}")
 
-        annotations = parse_annotations(text, all_annotations, verbose=not args.quiet)
+        annotations = parse_annotations(text, all_annotations, verbose=args.verbose)
         all_annotations.update(annotations)
 
         if filename == 'array_object.md':
@@ -185,7 +207,7 @@ def main():
                 annotated_sig = sig
             else:
                 annotated_sig = add_annotation(sig, annotations[func_name])
-            if not args.quiet:
+            if args.verbose:
                 print(f"Writing stub for {annotated_sig}")
             code += f"""
 def {annotated_sig}:{doc}
@@ -206,14 +228,17 @@ def {annotated_sig}:{doc}
                         annotation[k] = v.replace(normal_op, func_name)
                     annotations[func_name] = annotation
 
-        for const in constants + attributes:
-            if not args.quiet:
+        for const in constants:
+            if args.verbose:
                 print(f"Writing stub for {const}")
-            isattr = const in attributes
-            if isattr:
-                code += f"\n# Note: {const} is an attribute of the array object."
             code += f"\n{const} = None\n"
             modules[module_name].append(const)
+
+        for attr in attributes:
+            annotation = annotations[attr]['return']
+            code += f"\n# Note: {attr} is an attribute of the array object."
+            code += f"\n{attr}: {annotation} = None\n"
+            modules[module_name].append(attr)
 
         code += '\n__all__ = ['
         code += ', '.join(f"'{i}'" for i in modules[module_name])
@@ -225,7 +250,7 @@ def {annotated_sig}:{doc}
         with open(py_path, 'w') as f:
             f.write(code)
         if filename == 'elementwise_functions.md':
-            special_cases = parse_special_cases(text, verbose=not args.quiet)
+            special_cases = parse_special_cases(text, verbose=args.verbose)
             for func in special_cases:
                 py_path = os.path.join('array_api_tests', 'special_cases', f'test_{func}.py')
                 tests = []
@@ -259,6 +284,7 @@ def {annotated_sig}:{doc}
             for module_name in modules:
                 if module_name == 'linalg':
                     f.write(f'\nfrom . import {module_name}\n')
+                    f.write("\n__all__ += ['linalg']\n")
                     continue
                 f.write(f"\nfrom .{module_name} import ")
                 f.write(', '.join(modules[module_name]))
@@ -291,7 +317,7 @@ SPECIAL_CASE_REGEXS = dict(
     TWO_ARGS_EQUAL__LESS_NOTEQUAL = regex.compile(rf'^- +If `x1_i` is {_value}, `x2_i` is less than {_value}, and `x2_i` is not {_value}, the result is {_value}\.$'),
     TWO_ARGS_EQUAL__GREATER_EQUAL = regex.compile(rf'^- +If `x1_i` is {_value}, `x2_i` is greater than {_value}, and `x2_i` is {_value}, the result is {_value}\.$'),
     TWO_ARGS_EQUAL__GREATER_NOTEQUAL = regex.compile(rf'^- +If `x1_i` is {_value}, `x2_i` is greater than {_value}, and `x2_i` is not {_value}, the result is {_value}\.$'),
-    TWO_ARGS_NOTEQUAL__EQUAL = regex.compile(rf'^- +If `x1_i` is not equal to {_value} and `x2_i` is {_value}, the result is {_value}\.$'),
+    TWO_ARGS_NOTEQUAL__EQUAL = regex.compile(rf'^- +If `x1_i` is not (?:equal to )?{_value} and `x2_i` is {_value}, the result is {_value}\.$'),
     TWO_ARGS_ABSEQUAL__EQUAL = regex.compile(rf'^- +If `abs\(x1_i\)` is {_value} and `x2_i` is {_value}, the result is {_value}\.$'),
     TWO_ARGS_ABSGREATER__EQUAL = regex.compile(rf'^- +If `abs\(x1_i\)` is greater than {_value} and `x2_i` is {_value}, the result is {_value}\.$'),
     TWO_ARGS_ABSLESS__EQUAL = regex.compile(rf'^- +If `abs\(x1_i\)` is less than {_value} and `x2_i` is {_value}, the result is {_value}\.$'),
@@ -691,8 +717,12 @@ def parse_annotations(spec_text, all_annotations, verbose=False):
             if m:
                 param, typ = m.groups()
                 if is_returns:
-                    param = 'returns'
+                    param = 'return'
                     is_returns = False
+                if name == '__setitem__':
+                    # setitem returns None so it doesn't have a Returns
+                    # section in the spec
+                    annotations[name]['return'] = 'None'
                 typ = clean_type(typ)
                 if verbose:
                     print(f"Matched parameter for {name}: {param}: {typ}")
@@ -711,12 +741,12 @@ def clean_type(typ):
     return typ
 
 def add_annotation(sig, annotation):
-    if 'returns' not in annotation:
+    if 'return' not in annotation:
         raise RuntimeError(f"No return annotation for {sig}")
     if 'out' in annotation:
         raise RuntimeError(f"Error parsing annotations for {sig}")
     for param, typ in annotation.items():
-        if param == 'returns':
+        if param == 'return':
             sig = f"{sig} -> {typ}"
             continue
         PARAM_DEFAULT = regex.compile(rf"([\( ]{param})=")

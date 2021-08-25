@@ -11,7 +11,7 @@ https://github.com/data-apis/array-api/blob/master/spec/API_specification/array_
 from __future__ import annotations
 
 from enum import IntEnum
-from ._types import Optional, PyCapsule, Tuple, Union, array
+from ._types import Any, Optional, PyCapsule, Tuple, Union, array, ellipsis
 
 def __abs__(self: array, /) -> array:
     """
@@ -43,7 +43,7 @@ def __bool__(self: array, /) -> bool:
     """
     pass
 
-def __dlpack__(self: array, /, *, stream: Optional[int] = None) -> PyCapsule:
+def __dlpack__(self: array, /, *, stream: Optional[Union[int, Any]] = None) -> PyCapsule:
     """
     Note: __dlpack__ is a method of the array object.
     """
@@ -181,7 +181,7 @@ def __rshift__(self: array, other: Union[int, array], /) -> array:
     """
     pass
 
-def __setitem__(self, key, value, /):
+def __setitem__(self: array, key: Union[int, slice, ellipsis, Tuple[Union[int, slice, ellipsis], ...], array], value: Union[int, float, bool, array], /) -> None:
     """
     Note: __setitem__ is a method of the array object.
     """
@@ -362,21 +362,21 @@ def __rxor__(self: array, other: Union[int, bool, array], /) -> array:
     pass
 
 # Note: dtype is an attribute of the array object.
-dtype = None
+dtype: dtype = None
 
 # Note: device is an attribute of the array object.
-device = None
+device: device = None
 
 # Note: ndim is an attribute of the array object.
-ndim = None
+ndim: int = None
 
 # Note: shape is an attribute of the array object.
-shape = None
+shape: Union[Tuple[int, ...], shape] = None
 
 # Note: size is an attribute of the array object.
-size = None
+size: int = None
 
 # Note: T is an attribute of the array object.
-T = None
+T: array = None
 
 __all__ = ['__abs__', '__add__', '__and__', '__array_namespace__', '__bool__', '__dlpack__', '__dlpack_device__', '__eq__', '__float__', '__floordiv__', '__ge__', '__getitem__', '__gt__', '__int__', '__invert__', '__le__', '__len__', '__lshift__', '__lt__', '__matmul__', '__mod__', '__mul__', '__ne__', '__neg__', '__or__', '__pos__', '__pow__', '__rshift__', '__setitem__', '__sub__', '__truediv__', '__xor__', '__iadd__', '__radd__', '__iand__', '__rand__', '__ifloordiv__', '__rfloordiv__', '__ilshift__', '__rlshift__', '__imatmul__', '__rmatmul__', '__imod__', '__rmod__', '__imul__', '__rmul__', '__ior__', '__ror__', '__ipow__', '__rpow__', '__irshift__', '__rrshift__', '__isub__', '__rsub__', '__itruediv__', '__rtruediv__', '__ixor__', '__rxor__', 'dtype', 'device', 'ndim', 'shape', 'size', 'T']
