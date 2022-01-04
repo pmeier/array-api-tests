@@ -203,3 +203,14 @@ RuntimeError: Overflow when unpacking long
 ```
 
 Reference: [#59868](https://github.com/pytorch/pytorch/issues/59868)
+
+
+# full 
+
+- no support for integer inputs
+
+# finfo tiny -> smallest normal
+
+# test arange
+
+do not check for output dtype
