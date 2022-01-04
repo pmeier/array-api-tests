@@ -67,19 +67,6 @@ This is [not documented well](https://github.com/pytorch/pytorch/issues/58489), 
 
 Reference: [#58736](https://github.com/pytorch/pytorch/issues/58736)
 
-## Constants
-
-The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/constants.html) four numeric constants:
-
-- `e`
-- `inf`
-- `nan`
-- `pi`
-
-PyTorch supports none.
-
-Reference: [#58739](https://github.com/pytorch/pytorch/issues/58739)
-
 ## `logical_*` operators with scalars
 
 The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/constants.html) that the operators `logical_(and|not|or|xor)` should accept one scalar the same way arithmetic functions do.

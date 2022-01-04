@@ -9,9 +9,6 @@ array_module = torch
 array_module.asarray = torch.as_tensor
 array_module.equal = torch.eq
 
-for constant in ("e", "inf", "nan", "pi"):
-    setattr(array_module, constant, getattr(math, constant))
-
 array_module.Tensor.size = property(lambda self: self.numel())
 
 
