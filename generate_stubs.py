@@ -7,27 +7,75 @@ repo, then run
 
 ./generate_stubs.py path/to/clone/of/array-api
 
-This will update the stub files in array_api_tests/function_stubs/
+This will update the stub files in xptests/function_stubs/
 """
+from __future__ import annotations
+
 import argparse
 import os
-import sys
 import ast
 import itertools
 from collections import defaultdict
+from typing import DefaultDict, Dict, List
+from pathlib import Path
 
 import regex
 from removestar.removestar import fix_code
 
 FUNCTION_HEADER_RE = regex.compile(r'\(function-(.*?)\)')
+METHOD_HEADER_RE = regex.compile(r'\(method-(.*?)\)')
 HEADER_RE = regex.compile(r'\((?:function-linalg|function|method|constant|attribute)-(.*?)\)')
 FUNCTION_RE = regex.compile(r'\(function-.*\)=\n#+ ?(.*\(.*\))')
 METHOD_RE = regex.compile(r'\(method-.*\)=\n#+ ?(.*\(.*\))')
 CONSTANT_RE = regex.compile(r'\(constant-.*\)=\n#+ ?(.*)')
 ATTRIBUTE_RE = regex.compile(r'\(attribute-.*\)=\n#+ ?(.*)')
-IN_PLACE_OPERATOR_RE = regex.compile(r'- `.*`. May be implemented via `__i(.*)__`.')
-REFLECTED_OPERATOR_RE = regex.compile(r'- `__r(.*)__`')
+IN_PLACE_OPERATOR_RE = regex.compile(r'- +`.*`. May be implemented via `__i(.*)__`.')
+REFLECTED_OPERATOR_RE = regex.compile(r'- +`__r(.*)__`')
 ALIAS_RE = regex.compile(r'Alias for {ref}`function-(.*)`.')
+
+OPS = [
+    '__abs__',
+    '__add__',
+    '__and__',
+    '__bool__',
+    '__eq__',
+    '__float__',
+    '__floordiv__',
+    '__ge__',
+    '__getitem__',
+    '__gt__',
+    '__invert__',
+    '__le__',
+    '__lshift__',
+    '__lt__',
+    '__matmul__',
+    '__mod__',
+    '__mul__',
+    '__ne__',
+    '__neg__',
+    '__or__',
+    '__pos__',
+    '__pow__',
+    '__rshift__',
+    '__sub__',
+    '__truediv__',
+    '__xor__'
+]
+IOPS = [
+    '__iadd__',
+    '__isub__',
+    '__imul__',
+    '__itruediv__',
+    '__ifloordiv__',
+    '__ipow__',
+    '__imod__',
+    '__imatmul__',
+    '__iand__',
+    '__ior__',
+    '__ixor__',
+    '__ilshift__',
+    '__irshift__'
+]
 
 NAME_RE = regex.compile(r'(.*?)\(.*\)')
 
@@ -82,6 +130,44 @@ from hypothesis import given
 
 '''
 
+OP_SPECIAL_CASES_HEADER = '''\
+"""
+Special cases tests for {func}.
+
+These tests are generated from the special cases listed in the spec.
+
+NOTE: This file is generated automatically by the generate_stubs.py script. Do
+not modify it directly.
+"""
+
+from ..array_helpers import *
+from ..hypothesis_helpers import numeric_arrays
+
+from hypothesis import given
+
+'''
+
+
+IOP_SPECIAL_CASES_HEADER = '''\
+"""
+Special cases tests for {func}.
+
+These tests are generated from the special cases listed in the spec.
+
+NOTE: This file is generated automatically by the generate_stubs.py script. Do
+not modify it directly.
+"""
+
+from operator import {operator}
+
+from ..array_helpers import *
+from ..hypothesis_helpers import numeric_arrays
+
+from hypothesis import given
+
+'''
+
+
 TYPES_HEADER = '''\
 """
 This file defines the types for type annotations.
@@ -128,15 +214,18 @@ __all__ = ['Any', 'List', 'Literal', 'NestedSequence', 'Optional',
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('array_api_repo', help="Path to clone of the array-api repository")
-    parser.add_argument('--no-write', help="""Print what it would do but don't
-    write any files""", action='store_false', dest='write')
-    parser.add_argument('-v', '--verbose', help="""Print verbose output to the terminal""", action='store_true')
+    parser.add_argument('--no-write', help="Print what it would do but don't write any files", action='store_false', dest='write')
+    parser.add_argument('-v', '--verbose', help="Print verbose output to the terminal", action='store_true')
     args = parser.parse_args()
 
-    types_path = os.path.join('array_api_tests', 'function_stubs', '_types.py')
+    types_path = os.path.join('xptests', 'function_stubs', '_types.py')
     if args.write:
         with open(types_path, 'w') as f:
             f.write(TYPES_HEADER)
+
+    special_cases_dir = Path('xptests/special_cases')
+    special_cases_dir.mkdir(exist_ok=True)
+    (special_cases_dir / '__init__.py').touch()
 
     spec_dir = os.path.join(args.array_api_repo, 'spec', 'API_specification')
     extensions_dir = os.path.join(args.array_api_repo, 'spec', 'extensions')
@@ -156,8 +245,6 @@ def main():
             continue
         if args.verbose:
             print(f"Found signatures in {filename}")
-        if not args.write:
-            continue
 
         title = filename.replace('.md', '').replace('_', ' ')
         if 'extensions' in file:
@@ -169,7 +256,7 @@ def main():
             title += " (Extension)"
         else:
             py_file = filename.replace('.md', '.py')
-        py_path = os.path.join('array_api_tests', 'function_stubs', py_file)
+        py_path = os.path.join('xptests', 'function_stubs', py_file)
         module_name = py_file.replace('.py', '')
         modules[module_name] = []
         if args.verbose:
@@ -244,31 +331,19 @@ def {annotated_sig}:{doc}
         code += ', '.join(f"'{i}'" for i in modules[module_name])
         code += ']\n'
 
-        with open(py_path, 'w') as f:
-            f.write(code)
+        if args.write:
+            with open(py_path, 'w') as f:
+                f.write(code)
         code = fix_code(code, file=py_path, verbose=False, quiet=False)
-        with open(py_path, 'w') as f:
-            f.write(code)
+        if args.write:
+            with open(py_path, 'w') as f:
+                f.write(code)
+
         if filename == 'elementwise_functions.md':
             special_cases = parse_special_cases(text, verbose=args.verbose)
             for func in special_cases:
-                py_path = os.path.join('array_api_tests', 'special_cases', f'test_{func}.py')
-                tests = []
-                for typ in special_cases[func]:
-                    multiple = len(special_cases[func][typ]) > 1
-                    for i, m in enumerate(special_cases[func][typ], 1):
-                        test_name_extra = typ.lower()
-                        if multiple:
-                            test_name_extra += f"_{i}"
-                        try:
-                            test = generate_special_case_test(func, typ, m,
-                                                              test_name_extra, sigs)
-                            if test is None:
-                                raise NotImplementedError("Special case test not implemented")
-                            tests.append(test)
-                        except:
-                            print(f"Error with {func}() {typ}: {m.group(0)}:\n", file=sys.stderr)
-                            raise
+                py_path = os.path.join('xptests', 'special_cases', f'test_{func}.py')
+                tests = make_special_case_tests(func, special_cases, sigs)
                 if tests:
                     code = SPECIAL_CASES_HEADER.format(func=func) + '\n'.join(tests)
                     # quiet=False will make it print a warning if a name is not found (indicating an error)
@@ -276,8 +351,33 @@ def {annotated_sig}:{doc}
                     if args.write:
                         with open(py_path, 'w') as f:
                             f.write(code)
+        elif filename == 'array_object.md':
+            op_special_cases = parse_special_cases(text, verbose=args.verbose)
+            for func in op_special_cases:
+                py_path = os.path.join('xptests', 'special_cases', f'test_dunder_{func[2:-2]}.py')
+                tests = make_special_case_tests(func, op_special_cases, sigs)
+                if tests:
+                    code = OP_SPECIAL_CASES_HEADER.format(func=func) + '\n'.join(tests)
+                    code = fix_code(code, file=py_path, verbose=False, quiet=False)
+                    if args.write:
+                        with open(py_path, 'w') as f:
+                            f.write(code)
+            iop_special_cases = {}
+            for name in IN_PLACE_OPERATOR_RE.findall(text):
+                op = f"__{name}__"
+                iop = f"__i{name}__"
+                iop_special_cases[iop] = op_special_cases[op]
+            for func in iop_special_cases:
+                py_path = os.path.join('xptests', 'special_cases', f'test_dunder_{func[2:-2]}.py')
+                tests = make_special_case_tests(func, iop_special_cases, sigs)
+                if tests:
+                    code = IOP_SPECIAL_CASES_HEADER.format(func=func, operator=func[2:-2]) + '\n'.join(tests)
+                    code = fix_code(code, file=py_path, verbose=False, quiet=False)
+                    if args.write:
+                        with open(py_path, 'w') as f:
+                            f.write(code)
 
-    init_path = os.path.join('array_api_tests', 'function_stubs', '__init__.py')
+    init_path = os.path.join('xptests', 'function_stubs', '__init__.py')
     if args.write:
         with open(init_path, 'w') as f:
             f.write(INIT_HEADER)
@@ -482,12 +582,39 @@ def test_{func}_special_cases_{test_name_extra}(arg1, arg2):
     {assertion}
 """
 
+OP_ONE_ARG_TEMPLATE = """
+{decorator}
+def test_{op}_special_cases_{test_name_extra}(arg1):
+    {doc}
+    res = (arg1).{func}()
+    mask = {mask}
+    {assertion}
+"""
+
+OP_TWO_ARGS_TEMPLATE = """
+{decorator}
+def test_{op}_special_cases_{test_name_extra}(arg1, arg2):
+    {doc}
+    res = arg1.{func}(arg2)
+    mask = {mask}
+    {assertion}
+"""
+
+IOP_TWO_ARGS_TEMPLATE = """
+{decorator}
+def test_{op}_special_cases_{test_name_extra}(arg1, arg2):
+    {doc}
+    res = asarray(arg1, copy=True)
+    {op}(res, arg2)
+    mask = {mask}
+    {assertion}
+"""
+
 REMAINING_TEMPLATE = """# TODO: Implement REMAINING test for:
 # {text}
 """
 
 def generate_special_case_test(func, typ, m, test_name_extra, sigs):
-
     doc = f'''"""
     Special case test for `{sigs[func]}`:
 
@@ -524,14 +651,25 @@ def generate_special_case_test(func, typ, m, test_name_extra, sigs):
         else:
             raise ValueError(f"Unrecognized special value type {typ}")
         assertion = get_assert("exactly_equal", result)
-        return ONE_ARG_TEMPLATE.format(
-            decorator=decorator,
-            func=func,
-            test_name_extra=test_name_extra,
-            doc=doc,
-            mask=mask,
-            assertion=assertion,
-        )
+        if func in OPS:
+            return OP_ONE_ARG_TEMPLATE.format(
+                decorator=decorator,
+                func=func,
+                op=func[2:-2],
+                test_name_extra=test_name_extra,
+                doc=doc,
+                mask=mask,
+                assertion=assertion,
+            )
+        else:
+            return ONE_ARG_TEMPLATE.format(
+                decorator=decorator,
+                func=func,
+                test_name_extra=test_name_extra,
+                doc=doc,
+                mask=mask,
+                assertion=assertion,
+            )
 
     elif typ.startswith("TWO_ARGS"):
         decorator = "@given(numeric_arrays, numeric_arrays)"
@@ -571,9 +709,9 @@ def generate_special_case_test(func, typ, m, test_name_extra, sigs):
 
             tomask = lambda t: t.lower().replace("either_equal", "equal").replace("equal", "exactly_equal")
             value1masks = [get_mask(tomask(t), 'arg1', v) for t, v in
-                           zip(arg1typs, arg1values)]
+                        zip(arg1typs, arg1values)]
             value2masks = [get_mask(tomask(t), 'arg2', v) for t, v in
-                           zip(arg2typs, arg2values)]
+                        zip(arg2typs, arg2values)]
             if len(value1masks) > 1:
                 if arg1typs[0] == "EITHER_EQUAL":
                     mask1 = f"logical_or({value1masks[0]}, {value1masks[1]})"
@@ -638,27 +776,52 @@ def generate_special_case_test(func, typ, m, test_name_extra, sigs):
             assertion = get_assert("exactly_equal", result)
         else:
             raise ValueError(f"Unrecognized special value type {typ}")
-        return TWO_ARGS_TEMPLATE.format(
-            decorator=decorator,
-            func=func,
-            test_name_extra=test_name_extra,
-            doc=doc,
-            mask=mask,
-            assertion=assertion,
-        )
+
+        if func in OPS:
+            return OP_TWO_ARGS_TEMPLATE.format(
+                decorator=decorator,
+                func=func,
+                op=func[2:-2],
+                test_name_extra=test_name_extra,
+                doc=doc,
+                mask=mask,
+                assertion=assertion,
+            )
+        elif func in IOPS:
+            return IOP_TWO_ARGS_TEMPLATE.format(
+                decorator=decorator,
+                func=func,
+                op=func[2:-2],
+                test_name_extra=test_name_extra,
+                doc=doc,
+                mask=mask,
+                assertion=assertion,
+            )
+        else:
+            return TWO_ARGS_TEMPLATE.format(
+                decorator=decorator,
+                func=func,
+                test_name_extra=test_name_extra,
+                doc=doc,
+                mask=mask,
+                assertion=assertion,
+            )
 
     elif typ == "REMAINING":
         return REMAINING_TEMPLATE.format(text=m.group(0))
+
     else:
         raise RuntimeError(f"Unexpected type {typ}")
 
-def parse_special_cases(spec_text, verbose=False):
+def parse_special_cases(spec_text, verbose=False) -> Dict[str, DefaultDict[str, List[regex.Match]]]:
     special_cases = {}
     in_block = False
+    name = None
     for line in spec_text.splitlines():
-        m = FUNCTION_HEADER_RE.match(line)
-        if m:
-            name = m.group(1)
+        func_m = FUNCTION_HEADER_RE.match(line)
+        meth_m = METHOD_HEADER_RE.match(line)
+        if func_m or meth_m:
+            name = func_m.group(1) if func_m else meth_m.group(1)
             special_cases[name] = defaultdict(list)
             continue
         if line == '#### Special Cases':
@@ -668,7 +831,7 @@ def parse_special_cases(spec_text, verbose=False):
             in_block = False
             continue
         if in_block:
-            if '- ' not in line:
+            if '- ' not in line or name is None:
                 continue
             for typ, reg in SPECIAL_CASE_REGEXS.items():
                 m = reg.match(line)
@@ -682,6 +845,20 @@ def parse_special_cases(spec_text, verbose=False):
 
     return special_cases
 
+def make_special_case_tests(func, special_cases: Dict[str, DefaultDict[str, List[regex.Match]]], sigs) -> List[str]:
+    tests = []
+    for typ in special_cases[func]:
+        multiple = len(special_cases[func][typ]) > 1
+        for i, m in enumerate(special_cases[func][typ], 1):
+            test_name_extra = typ.lower()
+            if multiple:
+                test_name_extra += f"_{i}"
+            test = generate_special_case_test(func, typ, m, test_name_extra, sigs)
+            assert test is not None  # sanity check
+            tests.append(test)
+    return tests
+
+
 PARAMETER_RE = regex.compile(r"- +\*\*(.*)\*\*: _(.*)_")
 def parse_annotations(spec_text, all_annotations, verbose=False):
     annotations = defaultdict(dict)
@@ -690,15 +867,15 @@ def parse_annotations(spec_text, all_annotations, verbose=False):
     for line in spec_text.splitlines():
         m = HEADER_RE.match(line)
         if m:
-            name = m.group(1)
+            name = m.group(1).replace('-', '_')
             continue
         m = ALIAS_RE.match(line)
         if m:
-            alias_name = m.group(1)
+            alias_name = m.group(1).replace('-', '_')
             if alias_name not in all_annotations:
                 print(f"Warning: No annotations for aliased function {name}")
             else:
-                annotations[name] = all_annotations[m.group(1)]
+                annotations[name] = all_annotations[alias_name]
             continue
         if line == '#### Parameters':
             in_block = True
