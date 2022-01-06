@@ -1,11 +1,18 @@
 import functools
 import math
 
+from collections import namedtuple
+
 import torch
 
-from torch import arange, finfo, full, linspace
+from torch import arange, asarray, finfo, full, linspace, sort, unique
 
 sign = functools.partial(math.copysign, 1)
+
+
+class ArrayAPIDivergence(Exception):
+    pass
+
 
 TYPE_RANKS = {
     bool: 0,
@@ -27,8 +34,7 @@ def promote_scalars(*scalars, to=None):
 
 array_module = torch
 
-array_module.asarray = torch.as_tensor
-array_module.equal = torch.eq
+array_module.astype = torch.Tensor.to
 
 
 class SizeWrapper(int):
@@ -37,11 +43,28 @@ class SizeWrapper(int):
         obj._shape = tensor.shape
         return obj
 
-    def __call__(self):
-        return self._shape
+    def __call__(self, dim=None):
+        if dim is None:
+            return self._shape
+
+        return self._shape[dim]
 
 
-torch.Tensor.size = property(lambda self: SizeWrapper(self))
+array_module.Tensor.size = property(lambda self: SizeWrapper(self))
+
+
+patched_equal = torch.eq
+array_module.equal = patched_equal
+
+
+def patched_asarray(obj, *, dtype=None, **kwargs):
+    array = asarray(obj, dtype=dtype, **kwargs)
+    if dtype is None and type(obj) in TYPE_RANKS:
+        array = array.to(torch.tensor(type(obj)()).dtype)
+    return array
+
+
+array_module.asarray = patched_asarray
 
 
 def patched_full(shape, *args, **kwargs):
@@ -68,7 +91,9 @@ array_module.finfo = PatchedFinfo
 def patch_eye(eye):
     def wrapper(n, m=None, *, k=0, **kwargs):
         if k != 0:
-            raise TypeError("`torch.eye` currently does not support the 'k' parameter")
+            raise ArrayAPIDivergence(
+                "`torch.eye` currently does not support the 'k' parameter"
+            )
         if m is None:
             return eye(n, **kwargs)
         else:
@@ -82,9 +107,6 @@ array_module.eye = patch_eye(torch.eye)
 
 def patched_arange(arg1, arg2=None, step=1, **kwargs):
     start, end = (0, arg1) if arg2 is None else (arg1, arg2)
-    if sign(end - start) != sign(step):
-        start, end, step = promote_scalars(0, 0, 1, to=promote_type(start, end, step))
-
     return arange(start, end, step, **kwargs)
 
 
@@ -93,10 +115,39 @@ array_module.arange = patched_arange
 
 def patched_linspace(*args, endpoint=True, **kwargs):
     if not endpoint:
-        raise TypeError(
+        raise ArrayAPIDivergence(
             "`torch.linspace` currently does not support the 'endpoint' parameter"
         )
     return linspace(*args, **kwargs)
 
 
 array_module.linspace = patched_linspace
+
+
+def patched_unique_counts(*args, **kwargs):
+    return namedtuple("UniqueCounts", ("values", "counts"))._make(
+        unique(*args, return_counts=True, **kwargs)
+    )
+
+
+def patched_unique_inverse(*args, **kwargs):
+    return namedtuple("UniqueInverse", ("values", "inverse_indices"))._make(
+        unique(*args, return_inverse=True, **kwargs)
+    )
+
+
+array_module.unique_counts = patched_unique_counts
+array_module.unique_inverse = patched_unique_inverse
+array_module.unique_values = unique
+
+
+def patched_sort(*args, **kwargs):
+    return sort(*args, **kwargs).values
+
+
+def patched_argsort(*args, **kwargs):
+    return sort(*args, **kwargs).indices
+
+
+array_module.sort = patched_sort
+array_module.argsort = patched_argsort
