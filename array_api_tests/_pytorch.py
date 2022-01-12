@@ -58,10 +58,13 @@ array_module.equal = patched_equal
 
 
 def patched_asarray(obj, *, dtype=None, **kwargs):
-    array = asarray(obj, dtype=dtype, **kwargs)
-    if dtype is None and type(obj) in TYPE_RANKS:
-        array = array.to(torch.tensor(type(obj)()).dtype)
-    return array
+    obj_type = type(obj)
+    if obj_type in {bool, int, float}:
+        obj = torch.tensor(obj, dtype=torch.float64 if obj_type is float else torch.int64)
+        if dtype is None:
+            dtype = torch.bool if obj_type is bool else torch.tensor(obj_type()).dtype
+
+    return asarray(obj, dtype=dtype, **kwargs)
 
 
 array_module.asarray = patched_asarray
