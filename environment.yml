@@ -1,12 +1,13 @@
 name: array-api-tests-pytorch
 channels:
+  - conda-forge
   - pytorch-nightly
 dependencies:
   # array-api-tests
   - python>=3.8
   - pytest
   - hypothesis
-  - numpy
+  - numpy>=1.22
   # pytorch
   - pytorch
   - cpuonly
