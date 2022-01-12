@@ -649,7 +649,7 @@ def test_cosh(x):
     ah.assert_exactly_equal(domain, codomain)
 
 
-@pytest.mark.parametrize(binary_argnames, make_binary_params("divide", dh.float_dtypes))
+@pytest.mark.parametrize(binary_argnames, make_binary_params("divide", dh.numeric_dtypes))
 @given(data=st.data())
 def test_divide(
     func_name,
@@ -1252,7 +1252,7 @@ def test_positive(func_name, func, strat, data):
     ah.assert_exactly_equal(out, x)
 
 
-@pytest.mark.parametrize(binary_argnames, make_binary_params("pow", dh.float_dtypes))
+@pytest.mark.parametrize(binary_argnames, make_binary_params("pow", dh.numeric_dtypes))
 @given(data=st.data())
 def test_pow(
     func_name,
@@ -1267,6 +1267,12 @@ def test_pow(
 ):
     left = data.draw(left_strat, label=left_sym)
     right = data.draw(right_strat, label=right_sym)
+    if right_is_scalar:
+        if isinstance(right, int):
+            assume(right >= 0)
+    else:
+        if dh.is_int_dtype(right.dtype):
+            assume(xp.all(right >= 0))
 
     try:
         func(left, right)

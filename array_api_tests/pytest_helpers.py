@@ -23,6 +23,7 @@ __all__ = [
     "assert_result_shape",
     "assert_keepdimable_shape",
     "assert_fill",
+    "assert_array",
 ]
 
 
@@ -208,13 +209,13 @@ def assert_scalar_equals(
     out_repr = "out" if idx == () else f"out[{idx}]"
     f_func = f"{func_name}({fmt_kw(kw)})"
     if type_ is bool or type_ is int:
-        msg = f"{out_repr}={out}, should be {expected} [{f_func}]"
+        msg = f"{out_repr}={out}, but should be {expected} [{f_func}]"
         assert out == expected, msg
     elif math.isnan(expected):
-        msg = f"{out_repr}={out}, should be {expected} [{f_func}]"
+        msg = f"{out_repr}={out}, but should be {expected} [{f_func}]"
         assert math.isnan(out), msg
     else:
-        msg = f"{out_repr}={out}, should be roughly {expected} [{f_func}]"
+        msg = f"{out_repr}={out}, but should be roughly {expected} [{f_func}]"
         assert math.isclose(out, expected, rel_tol=0.25, abs_tol=1), msg
 
 
@@ -226,3 +227,20 @@ def assert_fill(
         assert ah.all(ah.isnan(out)), msg
     else:
         assert ah.all(ah.equal(out, ah.asarray(fill_value, dtype=dtype))), msg
+
+
+def assert_array(func_name: str, out: Array, expected: Array, /, **kw):
+    assert_dtype(func_name, out.dtype, expected.dtype, **kw)
+    assert_shape(func_name, out.shape, expected.shape, **kw)
+    msg = f"out not as expected [{func_name}({fmt_kw(kw)})]\n{out=}\n{expected=}"
+    if dh.is_float_dtype(out.dtype):
+        neg_zeros = expected == -0.0
+        assert xp.all((out == -0.0) == neg_zeros), msg
+        pos_zeros = expected == +0.0
+        assert xp.all((out == +0.0) == pos_zeros), msg
+        nans = xp.isnan(expected)
+        assert xp.all(xp.isnan(out) == nans), msg
+        mask = ~(neg_zeros | pos_zeros | nans)
+        assert xp.all(out[mask] == expected[mask]), msg
+    else:
+        assert xp.all(out == expected), msg
