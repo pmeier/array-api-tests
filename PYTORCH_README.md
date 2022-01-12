@@ -460,17 +460,57 @@ The [array API specification stipulates](https://data-apis.org/array-api/latest/
 1. `dim=None` flattens all inputs before concatenating.
 2. negative `dim`'s index the dimensions starting from the last one.
 
-# ToDo
+## axis to dim remapping is not working for flip and roll
 
-- Investigate if the index order of `torch.sort(torch.tensor([0, 1, 0]), descending=True, stable=True).indices` is wrong or if it is an issue with the test suite
-- Investigate why the `axis` -> `dim` remapping is not working for
-  - `flip`
-  - `roll`
-  - `max`
-  - `mean`
-  - `prod`
-  - `std`
-  - `sum`
-  - `var`
-  - `all`
-  - `any`
+Reference: [#71210](https://github.com/pytorch/pytorch/issues/71210)
+
+Although not documented, the Python interface of PyTorch ops internally maps `axis` keywords to `dim` for `numpy` and in turn also for array API compliance:
+
+```python
+>>> t = torch.empty(1, 2, 1, 3)
+>>> t.squeeze(dim=2).shape
+torch.Size([1, 2, 3])
+>>> t.squeeze(axis=2).shape
+torch.Size([1, 2, 3])
+```
+
+This mapping does not work for the following ops:
+
+| op     | array API parameter | PyTorch parameter |
+|--------| --- | --- |
+| `flip` | [`axis`](https://data-apis.org/array-api/latest/API_specification/manipulation_functions.html#id3) | [`dims`](https://pytorch.org/docs/master/generated/torch.flip.html) |
+| `roll` | [`axis`](https://data-apis.org/array-api/latest/API_specification/manipulation_functions.html#roll-x-shift-axis-none) | [`dims`](https://pytorch.org/docs/master/generated/torch.roll.html) |
+
+## support setting `keepdim` without setting `dim`
+
+Reference: [#71209](https://github.com/pytorch/pytorch/issues/71209)
+
+The [array API specification stipulates](https://data-apis.org/array-api/latest/API_specification/utility_functions.html#all-x-axis-none-keepdims-false) that only the first argument in `all` is positional only. The other two, `dim` and `keepdim` need to be independently usable.
+
+```python
+>>> t = torch.full((2, 3), True)
+>>> torch.all(t)
+tensor(True)
+>>> torch.all(t, dim=1)
+tensor([True, True])
+>>> torch.all(t, dim=1, keepdims=True)
+tensor([[True],
+        [True]])
+>>> torch.all(t, keepdims=True)
+TypeError: all() received an invalid combination of arguments - got (Tensor, keepdims=bool), but expected one of:
+ * (Tensor input, *, Tensor out)
+ * (Tensor input, int dim, bool keepdim, *, Tensor out)
+ * (Tensor input, name dim, bool keepdim, *, Tensor out)
+```
+
+The same applies to the following other ops:
+
+- `any`
+- `max`
+- `mean`
+- `prod`
+- `std`
+- `sum`
+- `var`
+
+This issue is related to #70914, which likely uses the same underlying functionality to parse inputs.
