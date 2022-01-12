@@ -4,7 +4,7 @@ This documents all deviations of [PyTorch](https://pytorch.org) from the array A
 specification identified by the test suite.
 
 Array API specification commit:
-[85b5499](https://github.com/data-apis/array-api/commit/85b549947e41d3a4b65fa3b17f1a95515a35e11c)
+[dec7fef](https://github.com/data-apis/array-api/commit/dec7fef38fe1fda978f52476bdaa48122b771feb)
 
 PyTorch version: `1.11.0.dev20220103`
 
